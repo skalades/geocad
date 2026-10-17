@@ -637,11 +637,11 @@ function SingleCrossSectionCard({
   scale = 100,
   _width = 1060,
   isDark = false,
-  showDesign = true,
+  showDesign = false,
   template = DEFAULT_ROAD_TEMPLATE,
   stationIndex = 0,
   totalStationsCount = 1,
-  showKop = true,
+  showKop = false,
 }) {
   const svgRef = useRef(null);
 

@@ -11,7 +11,6 @@ import {
   autoFixTrajectory,
   clearAllStationCenterlines,
   groupPointsIntoCrossSection,
-  SAMPLE_SURVEY_DATA,
 } from './utils/surveyParser';
 import {
   exportSurveyToCsv,
@@ -160,7 +159,6 @@ export default function App() {
   };
 
   const handleCreateProject = ({ name, location, client, surveyor, utmZone }) => {
-    const defaultData = processSurveyData(parseSurveyRawText(SAMPLE_SURVEY_DATA));
     const newProject = {
       id: `proj_${Date.now()}`,
       name,
@@ -176,9 +174,9 @@ export default function App() {
           name: 'Ruas Utama A',
           code: 'A',
           color: '#ef4444',
-          rawText: SAMPLE_SURVEY_DATA,
-          stations: defaultData.stations,
-          allPoints: defaultData.allPoints,
+          rawText: '',
+          stations: [],
+          allPoints: [],
         },
       ],
       intersections: [],

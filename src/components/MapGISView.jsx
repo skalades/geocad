@@ -108,8 +108,8 @@ export default function MapGISView({
       );
 
       const map = L.map(mapContainerRef.current, {
-        center: [-6.2, 106.8],
-        zoom: 15,
+        center: [-6.307, 107.307],
+        zoom: 13,
         layers: [osm],
       });
 

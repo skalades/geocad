@@ -65,7 +65,7 @@ export default function DataImportModal({
   activeSegmentName = '',
   activeSegmentColor = '#ef4444',
 }) {
-  const [inputText, setInputText] = useState(SAMPLE_SURVEY_DATA);
+  const [inputText, setInputText] = useState('');
   const [selectedZone, setSelectedZone] = useState(utmZone || '49S');
   const [autoSplitSegments, setAutoSplitSegments] = useState(true);
   const [autoTraseAs, setAutoTraseAs] = useState(false); // DEFAULT: FALSE (Semuanya Manual per user request)

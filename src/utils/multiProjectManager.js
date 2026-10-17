@@ -11,7 +11,8 @@ import {
   harmonizeAllStations,
 } from './surveyParser';
 
-export const WORKSPACE_STORAGE_KEY = 'georoad_survey_workspace_v2';
+export const WORKSPACE_STORAGE_KEY = 'georoad_survey_workspace_v3';
+export const PREV_STORAGE_KEY = 'georoad_survey_workspace_v2';
 export const LEGACY_STORAGE_KEY = 'georoad_survey_project_v1';
 
 // Sample Branch Road Data (heads North from STA 0+050 of main road)
@@ -27,55 +28,30 @@ export const SAMPLE_BRANCH_ROAD_DATA = `NO	CODE	X	Y	ELEVATION
 122	STA050	759225.000	9297098.333	43.690`;
 
 /**
- * Creates the initial default project with 2 segments and 1 intersection
+ * Creates the initial default project (Clean & Empty by default)
  */
 export function createDefaultProject() {
-  const mainRaw = SAMPLE_SURVEY_DATA;
-  const branchRaw = SAMPLE_BRANCH_ROAD_DATA;
-
-  const mainParsed = processSurveyData(parseSurveyRawText(mainRaw), { autoTraseAs: true });
-  const branchParsed = processSurveyData(parseSurveyRawText(branchRaw), { autoTraseAs: true });
-
   return {
     id: 'proj_default_01',
-    name: 'Preservasi Jalan Siliwangi & Cabang',
+    name: 'Proyek Survei Baru',
     location: 'Karawang, Jawa Barat',
     client: 'Dinas Bina Marga & Penataan Ruang',
     surveyor: 'Tim Survei Topografi Geodesi',
-    surveyDate: '2026-10-14',
+    surveyDate: new Date().toISOString().split('T')[0],
     utmZone: '48S',
     activeSegmentId: 'seg_main_01',
     segments: [
       {
         id: 'seg_main_01',
-        name: 'Jl. Siliwangi (Koridor Utama)',
+        name: 'Ruas Utama',
         code: 'A',
         color: '#ef4444', // Red
-        rawText: mainRaw,
-        stations: mainParsed.stations,
-        allPoints: mainParsed.allPoints,
-      },
-      {
-        id: 'seg_branch_02',
-        name: 'Jl. Melati (Cabang Simpang Tiga)',
-        code: 'B',
-        color: '#3b82f6', // Blue
-        rawText: branchRaw,
-        stations: branchParsed.stations,
-        allPoints: branchParsed.allPoints,
+        rawText: '',
+        stations: [],
+        allPoints: [],
       },
     ],
-    intersections: [
-      {
-        id: 'int_01',
-        name: 'Simpang Tiga Siliwangi - Melati',
-        mainSegmentId: 'seg_main_01',
-        mainStationName: 'STA 0+050',
-        branchSegmentId: 'seg_branch_02',
-        branchStationName: 'STA 0+000',
-        notes: 'Pertemuan As Jalan Cabang Jl. Melati ke As Jalan Utama Jl. Siliwangi di STA 0+050',
-      },
-    ],
+    intersections: [],
   };
 }
 
@@ -84,28 +60,42 @@ export function createDefaultProject() {
  */
 export function loadWorkspaceFromStorage() {
   try {
-    // 1. Check v2 multi-project workspace
+    // 1. Check v3 multi-project workspace
     const saved = localStorage.getItem(WORKSPACE_STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed.projects && parsed.projects.length > 0) {
-        // Auto-migrate default sample project to 48S if it was 49S
-        parsed.projects = parsed.projects.map((p) => {
-          if (p.id === 'proj_default_01' && p.utmZone === '49S') {
-            return { ...p, utmZone: '48S', location: 'Karawang, Jawa Barat' };
-          }
-          return p;
-        });
         return parsed;
       }
     }
 
-    // 2. Fallback: Migrate from v1 single project if available
+    // 2. Check if v2 had user-created projects (filter out old sample project proj_default_01)
+    const prevSaved = localStorage.getItem(PREV_STORAGE_KEY);
+    if (prevSaved) {
+      try {
+        const parsedV2 = JSON.parse(prevSaved);
+        const customProjects = (parsedV2.projects || []).filter(
+          (p) => p.id !== 'proj_default_01'
+        );
+        if (customProjects.length > 0) {
+          const migratedWs = {
+            activeProjectId: customProjects[0].id,
+            projects: customProjects,
+          };
+          saveWorkspaceToStorage(migratedWs);
+          return migratedWs;
+        }
+      } catch (err) {
+        console.warn('Migration from v2 failed:', err);
+      }
+    }
+
+    // 3. Fallback: Migrate from v1 single project if available and not sample
     const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (legacy) {
       try {
         const legacyProj = JSON.parse(legacy);
-        if (legacyProj.stations && legacyProj.allPoints) {
+        if (legacyProj.stations && legacyProj.stations.length > 0 && legacyProj.allPoints && legacyProj.allPoints.length > 0) {
           const harmonized = harmonizeAllStations(legacyProj.stations);
           const migratedProject = {
             id: 'proj_migrated_01',
@@ -114,7 +104,7 @@ export function loadWorkspaceFromStorage() {
             client: 'Pemberi Tugas',
             surveyor: 'Surveyor Proyek',
             surveyDate: new Date().toISOString().split('T')[0],
-            utmZone: legacyProj.utmZone || '49S',
+            utmZone: legacyProj.utmZone || '48S',
             activeSegmentId: 'seg_migrated_01',
             segments: [
               {
@@ -122,7 +112,7 @@ export function loadWorkspaceFromStorage() {
                 name: 'Segmen Utama 01',
                 code: 'A',
                 color: '#ef4444',
-                rawText: legacyProj.rawText || SAMPLE_SURVEY_DATA,
+                rawText: legacyProj.rawText || '',
                 stations: harmonized.stations,
                 allPoints: harmonized.allPoints,
               },
@@ -145,7 +135,7 @@ export function loadWorkspaceFromStorage() {
     console.error('Error reading workspace storage:', e);
   }
 
-  // 3. Otherwise initialize default project with 2 segments and intersection
+  // 4. Otherwise initialize default clean & empty project
   const defaultProj = createDefaultProject();
   const initialWorkspace = {
     activeProjectId: defaultProj.id,
