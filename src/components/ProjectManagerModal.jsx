@@ -24,6 +24,7 @@ export default function ProjectManagerModal({
   onDuplicateProject,
   onExportWorkspace,
   onImportWorkspace,
+  onResetWorkspace,
 }) {
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -130,6 +131,25 @@ export default function ProjectManagerModal({
               >
                 <Download className="w-3.5 h-3.5 text-slate-500" /> Backup Semua Proyek
               </button>
+              {onResetWorkspace && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'PERINGATAN: Apakah Anda yakin ingin mengosongkan semua data dan memulai proyek baru yang bersih?'
+                      )
+                    ) {
+                      onResetWorkspace();
+                      onClose();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-medium border border-rose-200 transition-colors"
+                  title="Hapus cache & kosongkan seluruh data proyek"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Kosongkan Data
+                </button>
+              )}
             </div>
           </div>
 

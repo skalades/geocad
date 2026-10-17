@@ -56,86 +56,62 @@ export function createDefaultProject() {
 }
 
 /**
- * Load workspace from LocalStorage or initialize with default
+ * Detects if a project is legacy sample/demo data (Siliwangi / Melati)
+ */
+export function isSampleProject(p) {
+  if (!p) return true;
+  if (p.id === 'proj_default_01' || p.id === 'proj_migrated_01') {
+    // If it has points or stations, it's the old sample project!
+    const hasAnyPoints = (p.segments || []).some(
+      (s) => (s.stations && s.stations.length > 0) || (s.allPoints && s.allPoints.length > 0)
+    );
+    if (hasAnyPoints) return true;
+  }
+  const name = (p.name || '').toLowerCase();
+  if (name.includes('siliwangi') || name.includes('preservasi')) return true;
+  const segs = p.segments || [];
+  for (const s of segs) {
+    const sName = (s.name || '').toLowerCase();
+    if (sName.includes('siliwangi') || sName.includes('melati')) return true;
+    if (s.rawText && (s.rawText.includes('759221.484') || s.rawText.includes('STA00\t759221'))) return true;
+  }
+  return false;
+}
+
+/**
+ * Load workspace from LocalStorage or initialize with clean empty default
  */
 export function loadWorkspaceFromStorage() {
   try {
-    // 1. Check v3 multi-project workspace
+    // Purge legacy storage keys completely
+    try {
+      localStorage.removeItem('georoad_survey_project_v1');
+      localStorage.removeItem('georoad_survey_workspace');
+      localStorage.removeItem('georoad_survey_workspace_v2');
+    } catch (_) {}
+
     const saved = localStorage.getItem(WORKSPACE_STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed.projects && parsed.projects.length > 0) {
-        return parsed;
-      }
-    }
-
-    // 2. Check if v2 had user-created projects (filter out old sample project proj_default_01)
-    const prevSaved = localStorage.getItem(PREV_STORAGE_KEY);
-    if (prevSaved) {
-      try {
-        const parsedV2 = JSON.parse(prevSaved);
-        const customProjects = (parsedV2.projects || []).filter(
-          (p) => p.id !== 'proj_default_01'
-        );
-        if (customProjects.length > 0) {
-          const migratedWs = {
-            activeProjectId: customProjects[0].id,
-            projects: customProjects,
+        // Discard any sample/demo projects
+        const validProjects = parsed.projects.filter((p) => !isSampleProject(p));
+        if (validProjects.length > 0) {
+          const activeId = validProjects.some((p) => p.id === parsed.activeProjectId)
+            ? parsed.activeProjectId
+            : validProjects[0].id;
+          return {
+            activeProjectId: activeId,
+            projects: validProjects,
           };
-          saveWorkspaceToStorage(migratedWs);
-          return migratedWs;
         }
-      } catch (err) {
-        console.warn('Migration from v2 failed:', err);
-      }
-    }
-
-    // 3. Fallback: Migrate from v1 single project if available and not sample
-    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (legacy) {
-      try {
-        const legacyProj = JSON.parse(legacy);
-        if (legacyProj.stations && legacyProj.stations.length > 0 && legacyProj.allPoints && legacyProj.allPoints.length > 0) {
-          const harmonized = harmonizeAllStations(legacyProj.stations);
-          const migratedProject = {
-            id: 'proj_migrated_01',
-            name: 'Proyek Survei Jalan Eksisting',
-            location: 'Lokasi Pengukuran Lapangan',
-            client: 'Pemberi Tugas',
-            surveyor: 'Surveyor Proyek',
-            surveyDate: new Date().toISOString().split('T')[0],
-            utmZone: legacyProj.utmZone || '48S',
-            activeSegmentId: 'seg_migrated_01',
-            segments: [
-              {
-                id: 'seg_migrated_01',
-                name: 'Segmen Utama 01',
-                code: 'A',
-                color: '#ef4444',
-                rawText: legacyProj.rawText || '',
-                stations: harmonized.stations,
-                allPoints: harmonized.allPoints,
-              },
-            ],
-            intersections: [],
-          };
-
-          const initialWorkspace = {
-            activeProjectId: migratedProject.id,
-            projects: [migratedProject],
-          };
-          saveWorkspaceToStorage(initialWorkspace);
-          return initialWorkspace;
-        }
-      } catch (err) {
-        console.warn('Migration from legacy project failed:', err);
       }
     }
   } catch (e) {
     console.error('Error reading workspace storage:', e);
   }
 
-  // 4. Otherwise initialize default clean & empty project
+  // Otherwise initialize default clean & empty project
   const defaultProj = createDefaultProject();
   const initialWorkspace = {
     activeProjectId: defaultProj.id,

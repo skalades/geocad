@@ -21,6 +21,7 @@ import {
   saveWorkspaceToStorage,
   createDefaultProject,
   tieIntersectionElevations,
+  isSampleProject,
 } from './utils/multiProjectManager';
 
 import MapGISView from './components/MapGISView';
@@ -149,6 +150,38 @@ export default function App() {
     );
     const updatedProj = { ...activeProject, segments: updatedSegments };
     updateActiveProject(updatedProj, toastMessage);
+  };
+
+  // Auto-purge any legacy sample survey projects (e.g. Siliwangi / Melati)
+  React.useEffect(() => {
+    if (workspace && workspace.projects) {
+      const filtered = workspace.projects.filter((p) => !isSampleProject(p));
+      if (filtered.length !== workspace.projects.length) {
+        const cleanProjects = filtered.length > 0 ? filtered : [createDefaultProject()];
+        const cleanWs = {
+          activeProjectId: cleanProjects[0].id,
+          projects: cleanProjects,
+        };
+        updateWorkspaceState(cleanWs);
+        setDatasetId((prev) => prev + 1);
+      }
+    }
+  }, []);
+
+  const handleResetWorkspace = () => {
+    try {
+      localStorage.removeItem('georoad_survey_project_v1');
+      localStorage.removeItem('georoad_survey_workspace');
+      localStorage.removeItem('georoad_survey_workspace_v2');
+      localStorage.removeItem('georoad_survey_workspace_v3');
+    } catch (_) {}
+    const defaultProj = createDefaultProject();
+    const cleanWs = {
+      activeProjectId: defaultProj.id,
+      projects: [defaultProj],
+    };
+    updateWorkspaceState(cleanWs, '✓ Seluruh data dikosongkan (Mulai dari Proyek Bersih)');
+    setDatasetId((prev) => prev + 1);
   };
 
   // ================= PROJECT ACTIONS =================
@@ -1037,6 +1070,7 @@ export default function App() {
         onDuplicateProject={handleDuplicateProject}
         onExportWorkspace={handleExportWorkspace}
         onImportWorkspace={handleImportWorkspace}
+        onResetWorkspace={handleResetWorkspace}
       />
 
       {/* 2. Intersection Manager Modal (Road Intersections & Junction Ties) */}
